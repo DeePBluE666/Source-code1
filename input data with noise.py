@@ -1,5 +1,5 @@
 
-#The input data without noise
+#The input data with noise
 #Model:DCT DeepAE CAE
 #Metric:MSE & cw-ssim
 
@@ -19,6 +19,7 @@ warnings.filterwarnings("ignore")
 import ssim.ssimlib as pyssim
 from skimage.measure import compare_ssim as ssim
 import cv2
+import skimage
 
 #-------------------------------------get data-------------------------------------#
 path = '/home/dataset/AE dataset/newdata//'
@@ -88,6 +89,14 @@ def get_data():
 	
 train_data, val_data = get_data()
 
+#Add speckle noise
+train_data_noise = train_data/255.
+val_data_noise = val_data/255.
+train_data_noise = skimage.util.noise.random_noise(train_data_noise, mode = 'speckle')
+train_data_noise = train_data_noise*255.
+val_data_noise = skimage.util.noise.random_noise(val_data_noise, mode = 'speckle')
+val_data_noise = val_data_noise*255.
+
 #---------------------------------DCT-------------------------------------#
 def DCT(image, dim = 30):
     
@@ -115,9 +124,11 @@ def DCT(image, dim = 30):
 similarity_1 = []
 MSE = []
 for i in range(val_data.shape[0]):
-    image1 = val_data[i].reshape(50, 60, 1)[:, :, 0]
+    image1 = val_data_noise[i].reshape(50, 60, 1)[:, :, 0]
+	image2 = val_data[i].reshape(50, 60, 1)[:, :, 0]
     image1 = image1.astype('float') 
-    p1 = Image.fromarray(image1).convert('L')
+	image2 = image2.astype('float') 
+    p1 = Image.fromarray(image2).convert('L')
     p2 = Image.fromarray(DCT(image1, dim = 30)).convert('L')
     similarity_temp_1 = pyssim.SSIM(p1).cw_ssim_value(p2)
     similarity_1.append([similarity_temp_1])
@@ -131,9 +142,11 @@ print('MSE: %s'%np.mean(MSE))
 
 #dim = 60
 for i in range(val_data.shape[0]):
-    image1 = val_data[i].reshape(50, 60, 1)[:, :, 0]
-    image1 = image1.astype('float') 
-    p1 = Image.fromarray(image1).convert('L')
+    image1 = val_data_noise[i].reshape(50, 60, 1)[:, :, 0]
+	image2 = val_data[i].reshape(50, 60, 1)[:, :, 0]
+    image1 = image1.astype('float')
+	image2 = image2.astype('float')
+    p1 = Image.fromarray(image2).convert('L')
     p2 = Image.fromarray(DCT(image1, dim = 60)).convert('L')
     similarity_temp_1 = pyssim.SSIM(p1).cw_ssim_value(p2)
     similarity_1.append([similarity_temp_1])
@@ -148,19 +161,29 @@ print('MSE: %s'%np.mean(MSE))
 
 #visualization
 
-plt.imshow(val_data[0][:, :, 0])
+plt.imshow(val_data_noise[0][:, :, 0])
 plt.show()
 
-image1 = val_data[0].reshape(50, 60, 1)[:, :, 0]
+image1 = val_data_noise[0].reshape(50, 60, 1)[:, :, 0]
 p2 = Image.fromarray(DCT(image1, dim = 60)).convert('L')
 
 plt.imshow(p2[:, :, 0])
 plt.show()
 
-
 #--------------------------------DeepAE------------------------------------#
+
+train_data, val_data = get_data()
+
 train_data = train_data.reshape([len(train_data), 3000])
-val_data = test_data.reshape([len(test_data), 3000])
+val_data = val_data.reshape([len(val_data), 3000])
+
+#Add speckle noise
+train_data_noise = train_data/255.
+val_data_noise = val_data/255.
+train_data_noise = skimage.util.noise.random_noise(train_data_noise, mode = 'speckle')
+train_data_noise = train_data_noise*255.
+val_data_noise = skimage.util.noise.random_noise(val_data_noise, mode = 'speckle')
+val_data_noise = val_data_noise*255.
 
 #dim = 30
 
@@ -179,19 +202,19 @@ decoded = Dense(3000, activation='linear')(decoded)
 autoencoder = Model(input_img, decoded)
 autoencoder.compile(optimizer='adam', loss='mean_squared_error')
 
-autoencoder.fit(train_data, train_data,
+autoencoder.fit(train_data_noise, train_data,
                 epochs=200,
                 batch_size=32,
                 shuffle=True,
-                validation_data=(test_data, test_data))
+                validation_data=(val_data_noise, val_data))
 				
 
-decoded_imgs = autoencoder.predict(test_data)
+decoded_imgs = autoencoder.predict(val_data_noise)
 
 
 similarity_1 = []
-for i in range(test_data.shape[0]):
-    p1 = Image.fromarray(test_data[i].reshape(50, 60, 1)[:, :, 0]).convert('L')
+for i in range(val_data.shape[0]):
+    p1 = Image.fromarray(val_data[i].reshape(50, 60, 1)[:, :, 0]).convert('L')
     p2 = Image.fromarray(decoded_imgs[i].reshape(50, 60, 1)[:, :, 0]).convert('L')
     similarity_temp_1 = pyssim.SSIM(p1).cw_ssim_value(p2)
     similarity_1.append([similarity_temp_1])
@@ -216,19 +239,19 @@ decoded = Dense(3000, activation='linear')(decoded)
 autoencoder = Model(input_img, decoded)
 autoencoder.compile(optimizer='adam', loss='mean_squared_error')
 
-autoencoder.fit(train_data, train_data,
+autoencoder.fit(train_data_noise, train_data,
                 epochs=200,
                 batch_size=32,
                 shuffle=True,
-                validation_data=(test_data, test_data))
+                validation_data=(val_data_noise, val_data))
 				
 
-decoded_imgs = autoencoder.predict(test_data)
+decoded_imgs = autoencoder.predict(val_data_noise)
 
 
 similarity_1 = []
-for i in range(test_data.shape[0]):
-    p1 = Image.fromarray(test_data[i].reshape(50, 60, 1)[:, :, 0]).convert('L')
+for i in range(val_data.shape[0]):
+    p1 = Image.fromarray(val_data[i].reshape(50, 60, 1)[:, :, 0]).convert('L')
     p2 = Image.fromarray(decoded_imgs[i].reshape(50, 60, 1)[:, :, 0]).convert('L')
     similarity_temp_1 = pyssim.SSIM(p1).cw_ssim_value(p2)
     similarity_1.append([similarity_temp_1])
@@ -238,9 +261,9 @@ print('cw-ssim: %s'%np.mean(similarity_1))
 
 #visualization
 
-decoded_imgs = autoencoder.predict(val_data)
+decoded_imgs = autoencoder.predict(val_data_noise)
 
-plt.imshow(val_data[0][:, :, 0])
+plt.imshow(val_data_noise[0][:, :, 0])
 plt.show()
 
 plt.imshow(decoded_imgs[0][:, :, 0])
@@ -273,13 +296,13 @@ decoded = Conv2D(1, (5, 5), activation='relu', padding='same')(x)
 autoencoder = Model(input_img, decoded)
 autoencoder.compile(optimizer='adam', loss='mean_squared_error')
 
-autoencoder.fit(train_data, train_data,
+autoencoder.fit(train_data_noise, train_data,
                 epochs=200,
                 batch_size=32,
                 shuffle=True,
-                validation_data=(val_data, val_data))
+                validation_data=(val_data_noise, val_data))
 				
-decoded_imgs = autoencoder.predict(val_data)
+decoded_imgs = autoencoder.predict(val_data_noise)
 val_data = val_data.astype('float32')
 
 similarity_1 = []
@@ -313,13 +336,13 @@ decoded = Conv2D(1, (5, 5), activation='relu', padding='same')(x)
 autoencoder = Model(input_img, decoded)
 autoencoder.compile(optimizer='adam', loss='mean_squared_error')
 
-autoencoder.fit(train_data, train_data,
+autoencoder.fit(train_data_noise, train_data,
                 epochs=200,
                 batch_size=32,
                 shuffle=True,
-                validation_data=(val_data, val_data))
+                validation_data=(val_data_noise, val_data))
 				
-decoded_imgs = autoencoder.predict(val_data)
+decoded_imgs = autoencoder.predict(val_data_noise)
 val_data = val_data.astype('float32')
 
 similarity_1 = []
@@ -334,9 +357,9 @@ print('cw-ssim: %s'%np.mean(similarity_1))
 
 #visualization
 
-decoded_imgs = autoencoder.predict(val_data)
+decoded_imgs = autoencoder.predict(val_data_noise)
 
-plt.imshow(val_data[0][:, :, 0])
+plt.imshow(val_data_noise[0][:, :, 0])
 plt.show()
 
 plt.imshow(decoded_imgs[0][:, :, 0])
